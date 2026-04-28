@@ -1,0 +1,398 @@
+[cc_zb_map-3.html](https://github.com/user-attachments/files/27184007/cc_zb_map-3.html)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CC &amp; ZB — Lead Map</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #0D1B2A; }
+#hdr {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: #0D1B2A; padding: 12px 14px 10px;
+  padding-top: max(env(safe-area-inset-top), 12px);
+}
+#hdr-row1 { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+#hdr h1 { font-size: 15px; font-weight: 700; color: white; flex: 1; }
+#stats { font-size: 11px; color: #7ab; white-space: nowrap; }
+#filter-row { display: flex; gap: 7px; flex-wrap: wrap; }
+#filter-row input, #filter-row select {
+  height: 32px; padding: 0 12px; border-radius: 16px; border: none;
+  font-size: 13px; background: #1e3248; color: #dde; outline: none; -webkit-appearance: none;
+}
+#filter-row input { width: 200px; }
+#progress-wrap { height: 3px; background: #1e3248; position: fixed; left: 0; right: 0; z-index: 99; top: var(--hdr-h, 90px); }
+#progress-fill { height: 100%; background: #4CAF50; width: 0; transition: width 0.4s; }
+#geocode-msg {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(13,27,42,.92); color: #dde; padding: 8px 16px;
+  border-radius: 20px; font-size: 12px; z-index: 300; white-space: nowrap; display: none;
+}
+#geocode-msg.show { display: block; }
+#map-wrap {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  top: calc(var(--hdr-h, 90px) + 3px);
+  overflow: hidden; background: #c8d4c0; touch-action: none; cursor: grab;
+}
+#map-wrap.dragging { cursor: grabbing; }
+#tiles { position: absolute; top: 0; left: 0; }
+#tiles img { position: absolute; width: 256px; height: 256px; display: block; }
+#pinlayer { position: absolute; top: 0; left: 0; }
+#pinlayer svg.pin { position: absolute; overflow: visible; cursor: pointer; }
+#zoom-ctrl { position: absolute; left: 14px; bottom: 30px; z-index: 50; display: flex; flex-direction: column; gap: 2px; }
+.zbtn {
+  width: 36px; height: 36px; background: white; border: none; font-size: 20px;
+  font-weight: 300; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  display: flex; align-items: center; justify-content: center; color: #333; cursor: pointer;
+}
+.zbtn:hover { background: #f0f0f0; }
+#list-panel {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 300px;
+  background: white; z-index: 60; overflow-y: auto;
+  box-shadow: -3px 0 16px rgba(0,0,0,.15);
+  transform: translateX(100%); transition: transform 0.25s ease;
+}
+#list-panel.open { transform: translateX(0); }
+#list-toggle {
+  position: absolute; right: 14px; top: 14px; z-index: 70;
+  height: 34px; padding: 0 14px; background: white; border: none;
+  border-radius: 17px; font-size: 13px; font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2); cursor: pointer; color: #0D1B2A;
+}
+#list-panel-header {
+  padding: 14px 14px 10px; position: sticky; top: 0;
+  background: white; border-bottom: 1px solid #eee; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between;
+}
+#list-panel-header h2 { font-size: 13px; font-weight: 600; color: #0D1B2A; }
+#list-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #888; padding: 2px 6px; }
+.list-item { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+.list-item:hover { background: #f7f9fc; }
+.li-name { font-size: 13px; font-weight: 600; color: #0D1B2A; margin-bottom: 2px; }
+.li-addr { font-size: 11px; color: #888; line-height: 1.4; }
+.li-phone { font-size: 11px; color: #185FA5; margin-top: 2px; }
+.li-pending { opacity: 0.5; }
+#sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
+  background: white; border-radius: 20px 20px 0 0;
+  box-shadow: 0 -4px 24px rgba(0,0,0,.2);
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(.25,.8,.25,1);
+  padding-bottom: env(safe-area-inset-bottom, 0); max-height: 55vh; overflow-y: auto;
+}
+#sheet.open { transform: translateY(0); }
+#sheet-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 10px auto 8px; }
+#sheet-body { padding: 0 18px 24px; }
+#sheet-close {
+  position: absolute; top: 10px; right: 14px; width: 28px; height: 28px;
+  background: #f0f0f0; border: none; border-radius: 50%; font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;
+}
+.s-name { font-size: 17px; font-weight: 600; color: #0D1B2A; margin-bottom: 8px; }
+.s-addr {
+  display: flex; align-items: flex-start; gap: 8px; background: #F0F6FF;
+  border-radius: 10px; padding: 12px; margin-bottom: 10px; text-decoration: none;
+}
+.s-addr-icon { font-size: 18px; flex-shrink: 0; }
+.s-addr-text { font-size: 13px; color: #185FA5; font-weight: 500; line-height: 1.4; }
+.s-hint { font-size: 11px; color: #888; font-weight: 400; }
+.s-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #444; margin-bottom: 7px; }
+.s-icon { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-row1">
+    <h1>CC &amp; ZB — Lead Map</h1>
+    <span id="stats">Locating addresses...</span>
+  </div>
+  <div id="filter-row">
+    <input id="srch" type="search" placeholder="&#128269; Search name or address..." oninput="applyFilter()" autocomplete="off" autocorrect="off" spellcheck="false">
+    <select id="fCity" onchange="applyFilter()">
+      <option value="">All cities</option>
+      <option value="Panama City">Panama City</option>
+      <option value="Panama City Beach">Panama City Beach</option>
+    </select>
+  </div>
+</div>
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="geocode-msg"></div>
+
+<div id="map-wrap">
+  <div id="tiles"></div>
+  <div id="pinlayer"></div>
+  <div id="zoom-ctrl">
+    <button class="zbtn" onclick="zoom(1)">+</button>
+    <button class="zbtn" onclick="zoom(-1)">−</button>
+  </div>
+  <button id="list-toggle" onclick="toggleList()">&#9776; List</button>
+</div>
+
+<div id="list-panel">
+  <div id="list-panel-header">
+    <h2 id="list-count">Leads</h2>
+    <button id="list-close" onclick="toggleList()">&#10005;</button>
+  </div>
+  <div id="list-body"></div>
+</div>
+
+<div id="sheet">
+  <div id="sheet-handle"></div>
+  <button id="sheet-close" onclick="closeSheet()">&#10005;</button>
+  <div id="sheet-body"></div>
+</div>
+
+<script>
+const RAW = [["Haydlee Slutzky", "3105 W 21st Ct Panama City, Florida", "", "Panama City"], ["Sam Richardson", "6302 Sunset Avenue Panama City, Florida", "(850) 842-5103", "Panama City"], ["Dale Munson", "1612 Hickory Avenue Panama City, Florida", "(850) 730-9253", "Panama City"], ["Joismar Jones", "1813 Arthur Avenue Panama City, Florida", "(850) 775-9906", "Panama City"], ["Michael Shoemaker", "119 Bridge Harbor Drive Panama City, Florida", "(850) 774-8773", "Panama City"], ["Angelica Meyerl", "106 Seaclusion Circle Panama City, Florida", "(904) 440-4193", "Panama City"], ["Frederick Miller", "3609 Oakbrook Lane Panama City, Florida", "(850) 276-0441", "Panama City"], ["James Holt", "416 Brady Way Panama City, Florida", "(850) 247-9900", "Panama City"], ["Robert Wood", "106 Oak Ridge Place Panama City, Florida", "(850) 319-2568", "Panama City"], ["Kerry Erickson", "6423 Summer Oak Drive Panama City, Florida", "(406) 570-7078", "Panama City"], ["Jason Tebault", "7227 Emerson Drive Panama City, Florida", "(850) 238-9955", "Panama City"], ["Richard Cowley", "2838 Longleaf Road Panama City, Florida", "(850) 532-8656", "Panama City"], ["John Huffines", "124 Palm Harbour Boulevard Panama City, Florida", "(423) 681-2112", "Panama City"], ["Melissa McLawhon", "327 North Cove Boulevard Panama City, Florida", "(850) 319-3830", "Panama City"], ["Thomas Widick", "12316 Hamilton Road Panama City, Florida", "(803) 468-7100", "Panama City"], ["Artie Digsby", "1100 Harvard Avenue Panama City, Florida", "(850) 258-0883", "Panama City"], ["Thomas Widick", "12316 Hamilton Road Panama City, Florida", "(803) 468-7100", "Panama City"], ["Alyssa Summers", "1021 Oxford Drive Panama City, Florida", "(850) 630-4590", "Panama City"], ["Awais Awan", "1821 Grant Avenue Panama City, Florida", "(850) 774-7254", "Panama City"], ["Wenworth Christie", "2517 Breezy Ln Panama City, Florida", "(850) 890-7880", "Panama City"], ["Tim Lorenzano", "2811 Agnes Scott Dr Panama City, Florida", "(704) 890-0336", "Panama City"], ["Seth Taylor", "1212 Fortune Avenue Panama City, Florida", "(850) 260-5013", "Panama City"], ["Dmitriy Trunin", "2312 Allison Avenue Panama City, Florida", "(850) 764-2279", "Panama City"], ["Zachary Thacker", "2516 Dorothy Avenue Panama City, Florida", "(850) 630-4138", "Panama City"], ["Ogechi Ohale", "126 Seaclusion Circle Panama City, Florida", "(815) 505-2404", "Panama City"], ["Shaun Cantrell", "5538 Mars Hill Lane Panama City, Florida", "(941) 225-1903", "Panama City"], ["Brandon Baxter", "5574 Mars Hill Lane Panama City, Florida", "(941) 225-1903", "Panama City"], ["Jacob Briney", "5566 Lexa Lane Panama City, Florida", "(941) 225-1003", "Panama City"], ["Angela Moore", "2009 2 Putt Lane Panama City, Florida", "(850) 624-7837", "Panama City"], ["Rollin Youmans", "916 Amber Way Panama City, Florida", "(850) 890-2249", "Panama City"], ["Tracy Owens", "4993 Conner Lane Panama City, Florida", "(850) 896-3515", "Panama City"], ["Samuel Ramos", "1519 Chandlee Avenue Panama City, Florida", "(850) 258-6400", "Panama City"], ["Ricky Cranford", "5314 Sunwood Road Panama City, Florida", "(850) 819-0575", "Panama City"], ["Linda Adamcryk", "4137 Russell Lane Panama City, Florida", "(850) 899-2091", "Panama City"], ["Edward Quinn", "3106 Wood Valley Road Panama City, Florida", "(850) 890-7386", "Panama City"], ["Carmen Labron", "2712 Rutgers Drive Panama City, Florida", "(706) 217-7333", "Panama City"], ["John Curnin", "731 Miles Drive Panama City, Florida", "(850) 814-5321", "Panama City"], ["Carmen Lebron", "2712 Rutgers Drive Panama City, Florida", "(706) 217-7333", "Panama City"], ["Sunobi Practice #2", "6004 Minneola Street Panama City, Florida", "(123) 456-6789", "Panama City"], ["Jon Bobby", "620 Mc Kenzie Avenue Panama City, Florida", "(123) 456-7890", "Panama City"], ["Braxton Anderson", "3565 Cedar Park Drive Panama City, Florida", "(307) 677-2204", "Panama City"], ["Braxton Anderson", "3565 Cedar Park Lane Panama City, Florida", "(555) 555-5555", "Panama City"], ["Test", "3565 Cedar Park Lane Panama City, Florida", "(555) 555-5555", "Panama City"], ["Gene Derosier", "1906 Cherry Street Panama City, Florida", "(777) 777-7777", "Panama City"], ["Elaina Stimel", "3993 Delisa Avenue Panama City, Florida", "(850) 481-2336", "Panama City"], ["Trena Nicole Hernadez", "4901 South Lakewood Drive Panama City, Florida", "(850) 832-4947", "Panama City"], ["Brenden Wetzbarger", "453 Albert Meadow Lane Panama City, Florida", "(712) 212-6203", "Panama City"], ["Claude Carter", "811 Brandeis Avenue Panama City, Florida", "(850) 625-8248", "Panama City"], ["Steven Walker", "2831 Malone Drive Panama City, Florida", "(518) 335-7751", "Panama City"], ["James Craft", "4251 Dairy Farm Road Panama City, Florida", "(850) 522-6627", "Panama City"], ["Henry Wallace", "400 Water Oak Cir Panama City Beach, Florida", "6034971825", "Panama City Beach"], ["Henry Wallace", "400 Water Oak Cir Panama City Beach, Florida", "(603) 497-1825", "Panama City Beach"], ["Tina Weathers", "611 Live Oak Ln Panama City Beach, Florida", "(850) 319-7467", "Panama City Beach"], ["Monique Williams", "201 Pelican Way Panama City Beach, Florida", "(850) 814-6327", "Panama City Beach"], ["Finza Lie", "121 Palm Bay Blvd Panama City Beach, Florida", "(912) 484-5095", "Panama City Beach"], ["Constance Beury", "606 Lake Powell Drive Panama City Beach, Florida", "(850) 399-0078", "Panama City Beach"], ["Dennis Fuller", "7019 North Lagoon Drive Panama City Beach, Florida", "(850) 544-9440", "Panama City Beach"], ["Charles Freeman", "574 Lagoon Oaks Drive Panama City Beach, Florida", "(850) 819-5058", "Panama City Beach"], ["Christine McLaughlin", "250 Escanaba Avenue Panama City Beach, Florida", "(850) 276-3192", "Panama City Beach"], ["Dean Troche", "8624 Gulf Pines Drive Panama City Beach, Florida", "(850) 867-0659", "Panama City Beach"], ["Timothy Lowder", "232 Escanaba Avenue Panama City Beach, Florida", "(361) 683-0917", "Panama City Beach"], ["Mark Clark", "215 Boca Shores Dr Panama City Beach, Florida", "(334) 207-4643", "Panama City Beach"], ["Philip Wolfe", "132 Palm Harbour Blvd Panama City Beach, Florida", "(205) 914-3603", "Panama City Beach"], ["Michael Janicek", "145 Rusty Gans Dr Panama City Beach, Florida", "(850) 730-5666", "Panama City Beach"], ["Mohammad Waheed", "201 Windsor Way Panama City Beach, Florida", "(850) 238-9229", "Panama City Beach"], ["Daniel Coats", "230 Hidden Pines Drive Panama City Beach, Florida", "(850) 851-9894", "Panama City Beach"], ["Michael Suzuki", "8213 Grand Bay Boulevard Panama City Beach, Florida", "8-3304", "Panama City Beach"], ["Debbie Hope", "107 Bonaire Drive Panama City Beach, Florida", "(334) 447-6412", "Panama City Beach"], ["Jennifer Mutluturk", "322 Eagle Drive Panama City Beach, Florida", "(941) 225-1003", "Panama City Beach"], ["Brenda Smith", "3812 Dolphin Drive Panama City Beach, Florida", "(850) 238-0096", "Panama City Beach"], ["Murray Causey", "7021 Beach Drive Panama City Beach, Florida", "(850) 818-2293", "Panama City Beach"], ["Richard Rodriguez", "2506 Pelican Bay Drive Panama City Beach, Florida", "(850) 227-6629", "Panama City Beach"], ["Madeline Willett", "304 Turtle Cove Panama City Beach, Florida", "(543) 879-0009", "Panama City Beach"], ["Michael Mckechnie", "762 Westwood Beach Circle Panama City Beach, Florida", "(850) 774-8588", "Panama City Beach"], ["Jeffery Decker", "700 Royal Palm Road Panama City Beach, Florida", "(757) 515-6455", "Panama City Beach"], ["Joseph Howard", "8311 Palm Garden Boulevard Panama City Beach, Florida", "(808) 223-7801", "Panama City Beach"], ["Victor Falkowski", "334 Hidden Island Drive Panama City Beach, Florida", "(65) 786-5876", "Panama City Beach"], ["Edwin Putman", "108 Royal Palm Boulevard Panama City Beach, Florida", "(205) 478-1527", "Panama City Beach"], ["Jorge Espinosa", "346 Emerald Cove Street Panama City Beach, Florida", "(850) 625-0060", "Panama City Beach"], ["Bradley Kirby", "507 Date Palm Court Panama City Beach, Florida", "(505) 400-4761", "Panama City Beach"], ["Michael Giniger", "110 Palm Crossing Boulevard Panama City Beach, Florida", "(850) 960-0743", "Panama City Beach"], ["Greg Marchi", "128 Rose Coral Drive Panama City Beach, Florida", "(850) 819-1649", "Panama City Beach"], ["Greg Marchi", "128 Rose Coral Drive Panama City Beach, Florida", "678-7576", "Panama City Beach"], ["Christy Maggiore", "1516 Salamander Trail Panama City Beach, Florida", "(850) 238-1727", "Panama City Beach"], ["James Arendale", "321 Fan Palm Place Panama City Beach, Florida", "(850) 814-3260", "Panama City Beach"], ["Ronny Lawson", "137 Boca Lagoon Drive Panama City Beach, Florida", "(757) 646-9578", "Panama City Beach"], ["Saeed Saeedi", "227 Middleburg Drive Panama City Beach, Florida", "(850) 708-5112", "Panama City Beach"]];
+const MAPTILER_KEY = "KuLlV88mTEcQXN8WbP2V";
+const STORAGE_KEY = 'cc_zb_coords_v2';
+
+let leads = RAW.map(r => ({ name:r[0], address:r[1], phone:r[2], city:r[3], lat:null, lng:null }));
+
+// Map state
+let Z=13, cx=-85.710, cy=30.185;
+const TILE=256;
+const wrap = document.getElementById('map-wrap');
+const tilesEl = document.getElementById('tiles');
+const pinEl = document.getElementById('pinlayer');
+
+function setHdrH(){ document.documentElement.style.setProperty('--hdr-h', document.getElementById('hdr').offsetHeight+'px'); }
+function lon2x(lon,z){ return ((lon+180)/360)*Math.pow(2,z); }
+function lat2y(lat,z){ const s=Math.sin(lat*Math.PI/180); return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*Math.pow(2,z); }
+function ll2px(lat,lon){
+  const W=wrap.offsetWidth, H=wrap.offsetHeight;
+  return [W/2+(lon2x(lon,Z)-lon2x(cx,Z))*TILE, H/2+(lat2y(lat,Z)-lat2y(cy,Z))*TILE];
+}
+
+function loadTiles(){
+  tilesEl.innerHTML='';
+  const W=wrap.offsetWidth, H=wrap.offsetHeight;
+  const oxf=lon2x(cx,Z), oyf=lat2y(cy,Z);
+  const ox=oxf*TILE, oy=oyf*TILE;
+  const x0=Math.floor(oxf-W/2/TILE), x1=Math.ceil(oxf+W/2/TILE);
+  const y0=Math.floor(oyf-H/2/TILE), y1=Math.ceil(oyf+H/2/TILE);
+  const max=Math.pow(2,Z)-1;
+  const subs=['a','b','c'];
+  for(let tx=x0;tx<=x1;tx++){
+    for(let ty=y0;ty<=y1;ty++){
+      if(ty<0||ty>max) continue;
+      const img=document.createElement('img');
+      const ntx=((tx%Math.pow(2,Z))+Math.pow(2,Z))%Math.pow(2,Z);
+      img.src=`https://${subs[(ntx+ty)%3]}.tile.openstreetmap.org/${Z}/${ntx}/${ty}.png`;
+      img.style.cssText=`position:absolute;left:${tx*TILE-ox+W/2}px;top:${ty*TILE-oy+H/2}px;width:256px;height:256px;`;
+      img.onerror=()=>{ img.style.display='none'; };
+      tilesEl.appendChild(img);
+    }
+  }
+}
+
+function makePinSVG(letter, color){
+  return `<path d="M11 0C5 0 0 5 0 11c0 7.5 11 19 11 19s11-11.5 11-19C22 5 17 0 11 0z" fill="${color}" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+    <text x="11" y="13" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">${letter}</text>`;
+}
+
+function getFiltered(){
+  const s=document.getElementById('srch').value.toLowerCase();
+  const c=document.getElementById('fCity').value;
+  return leads.filter(l=>{
+    return (!s||l.name.toLowerCase().includes(s)||l.address.toLowerCase().includes(s))
+        && (!c||l.city===c);
+  });
+}
+
+function renderPins(){
+  pinEl.innerHTML='';
+  const filtered=getFiltered();
+  const W=wrap.offsetWidth, H=wrap.offsetHeight;
+  filtered.forEach(lead=>{
+    if(!lead.lat||!lead.lng) return;
+    const [px,py]=ll2px(lead.lat,lead.lng);
+    if(px<-30||py<-30||px>W+30||py>H+30) return;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('width','44'); svg.setAttribute('height','52');
+    svg.setAttribute('viewBox','-11 -11 44 52'); svg.setAttribute('class','pin');
+    svg.style.cssText=`position:absolute;left:${px-22}px;top:${py-41}px;`;
+    const color = lead.city==='Panama City Beach' ? '#2E7D32' : '#1565C0';
+    svg.innerHTML=`<rect x="-11" y="-11" width="44" height="52" fill="transparent"/>` + makePinSVG(lead.name[0].toUpperCase(), color);
+    svg.addEventListener('click', e=>{e.stopPropagation(); openSheet(lead);});
+    svg.addEventListener('touchend', e=>{e.preventDefault(); e.stopPropagation(); openSheet(lead);});
+    pinEl.appendChild(svg);
+  });
+  const total=leads.length, done=leads.filter(l=>l.lat).length;
+  const filtDone=filtered.filter(l=>l.lat).length;
+  document.getElementById('stats').textContent = done<total
+    ? `Geocoding ${done}/${total}...`
+    : `${filtDone} of ${filtered.length} pins`;
+  renderList(filtered);
+}
+
+function applyFilter(){ renderPins(); }
+
+function renderList(filtered){
+  document.getElementById('list-count').textContent=`${filtered.length} leads`;
+  document.getElementById('list-body').innerHTML=filtered.map(l=>`
+    <div class="list-item ${!l.lat?'li-pending':''}" onclick="focusLead('${l.name.replace(/'/g,"\'")}')">
+      <div class="li-name">${l.name}${!l.lat?' ⏳':''}</div>
+      <div class="li-addr">${l.address}</div>
+      ${l.phone?`<div class="li-phone">${l.phone}</div>`:''}
+    </div>`).join('');
+}
+
+function focusLead(name){
+  const lead=leads.find(l=>l.name===name);
+  if(lead&&lead.lat){ cx=lead.lng; cy=lead.lat; Z=16; loadTiles(); renderPins(); }
+  if(lead) openSheet(lead);
+  if(listOpen) toggleList();
+}
+
+function openSheet(lead){
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const mapsUrl=isIOS
+    ?'https://maps.apple.com/?daddr='+encodeURIComponent(lead.address)
+    :'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(lead.address);
+  document.getElementById('sheet-body').innerHTML=`
+    <div class="s-name">${lead.name}</div>
+    <a class="s-addr" href="${mapsUrl}" target="_blank">
+      <span class="s-addr-icon">&#128205;</span>
+      <span class="s-addr-text">${lead.address}<br><span class="s-hint">Tap for directions</span></span>
+    </a>
+    ${lead.phone?`<div class="s-row"><span class="s-icon">&#128222;</span><a href="tel:${lead.phone}" style="color:#185FA5;text-decoration:none;">${lead.phone}</a></div>`:''}
+    ${lead.city?`<div class="s-row"><span class="s-icon">&#127968;</span><span>${lead.city}</span></div>`:''}
+  `;
+  document.getElementById('sheet').classList.add('open');
+}
+function closeSheet(){ document.getElementById('sheet').classList.remove('open'); }
+wrap.addEventListener('click',e=>{ if(e.target===wrap||e.target.tagName==='IMG') closeSheet(); });
+
+// ── GEOCODING via MapTiler ──────────────────────────────────
+function loadCache(){
+  try {
+    const saved=localStorage.getItem(STORAGE_KEY);
+    if(saved){
+      const cache=JSON.parse(saved);
+      leads.forEach(l=>{ if(cache[l.address]){ l.lat=cache[l.address][0]; l.lng=cache[l.address][1]; } });
+    }
+  } catch(e){}
+}
+
+function saveCache(){
+  try {
+    const cache={};
+    leads.forEach(l=>{ if(l.lat) cache[l.address]=[l.lat,l.lng]; });
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(cache));
+  } catch(e){}
+}
+
+let geocodedCount=0;
+
+async function geocodeAll(){
+  const pending=leads.filter(l=>!l.lat);
+  if(pending.length===0){
+    document.getElementById('progress-wrap').style.display='none';
+    document.getElementById('geocode-msg').classList.remove('show');
+    renderPins();
+    return;
+  }
+
+  const msg=document.getElementById('geocode-msg');
+  msg.classList.add('show');
+
+  for(let i=0; i<pending.length; i++){
+    const lead=pending[i];
+    msg.textContent=`📍 Locating ${geocodedCount+1}/${leads.length}: ${lead.name}...`;
+    const pct=((leads.length-pending.length+i)/leads.length*100).toFixed(0);
+    document.getElementById('progress-fill').style.width=pct+'%';
+
+    try {
+      const q=encodeURIComponent(lead.address);
+      const url=`https://api.maptiler.com/geocoding/${q}.json?key=${MAPTILER_KEY}&limit=1&country=us`;
+      const res=await fetch(url);
+      const data=await res.json();
+      if(data.features&&data.features.length>0){
+        const [lng,lat]=data.features[0].geometry.coordinates;
+        lead.lat=lat; lead.lng=lng;
+        saveCache();
+        renderPins();
+      }
+    } catch(e){
+      console.warn('Geocode failed:', lead.address, e);
+    }
+    geocodedCount++;
+    await new Promise(r=>setTimeout(r,120)); // MapTiler handles faster than Nominatim
+  }
+
+  document.getElementById('progress-fill').style.width='100%';
+  msg.textContent=`✅ All ${leads.length} addresses located!`;
+  setTimeout(()=>{
+    msg.classList.remove('show');
+    document.getElementById('progress-wrap').style.display='none';
+  }, 2000);
+  renderPins();
+}
+
+// ── TOUCH & MOUSE ───────────────────────────────────────────
+let panStart=null,panCx=null,panCy=null,touches={},lastDist=null;
+wrap.addEventListener('touchstart',e=>{
+  Array.from(e.changedTouches).forEach(t=>{touches[t.identifier]={x:t.clientX,y:t.clientY};});
+  if(e.touches.length===1){panStart={x:e.touches[0].clientX,y:e.touches[0].clientY};panCx=cx;panCy=cy;}
+  if(e.touches.length===2){const ids=Object.keys(touches);const a=touches[ids[0]],b=touches[ids[1]];lastDist=Math.hypot(b.x-a.x,b.y-a.y);panStart=null;}
+},{passive:true});
+wrap.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  Array.from(e.changedTouches).forEach(t=>{touches[t.identifier]={x:t.clientX,y:t.clientY};});
+  if(e.touches.length===1&&panStart){
+    const dx=e.touches[0].clientX-panStart.x,dy=e.touches[0].clientY-panStart.y;
+    const tc=Math.pow(2,Z);cx=panCx-dx/TILE/tc*360;
+    const ny=lat2y(panCy,Z)-dy/TILE;cy=Math.atan(Math.sinh(Math.PI*(1-2*ny/tc)))*180/Math.PI;
+    loadTiles();renderPins();
+  } else if(e.touches.length===2){
+    const ids=Object.keys(touches);
+    if(ids.length>=2){
+      const a=touches[ids[0]],b=touches[ids[1]],dist=Math.hypot(b.x-a.x,b.y-a.y);
+      if(lastDist){Z=Math.max(8,Math.min(18,Z+Math.log2(dist/lastDist)));}
+      lastDist=dist;loadTiles();renderPins();
+    }
+  }
+},{passive:false});
+wrap.addEventListener('touchend',e=>{
+  Array.from(e.changedTouches).forEach(t=>{delete touches[t.identifier];});
+  lastDist=null;
+  if(e.touches.length===1){panStart={x:e.touches[0].clientX,y:e.touches[0].clientY};panCx=cx;panCy=cy;}
+},{passive:true});
+
+let drag=false,dragX=0,dragY=0,dragCx=0,dragCy=0;
+wrap.addEventListener('mousedown',e=>{drag=true;dragX=e.clientX;dragY=e.clientY;dragCx=cx;dragCy=cy;wrap.classList.add('dragging');});
+document.addEventListener('mouseup',()=>{drag=false;wrap.classList.remove('dragging');});
+document.addEventListener('mousemove',e=>{
+  if(!drag)return;
+  const dx=e.clientX-dragX,dy=e.clientY-dragY;
+  const tc=Math.pow(2,Z);cx=dragCx-dx/TILE/tc*360;
+  const ny=lat2y(dragCy,Z)-dy/TILE;cy=Math.atan(Math.sinh(Math.PI*(1-2*ny/tc)))*180/Math.PI;
+  loadTiles();renderPins();
+});
+wrap.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY<0?1:-1);},{passive:false});
+
+function zoom(d){Z=Math.max(8,Math.min(18,Z+d));loadTiles();renderPins();}
+
+let listOpen=false;
+function toggleList(){
+  listOpen=!listOpen;
+  document.getElementById('list-panel').classList.toggle('open',listOpen);
+  document.getElementById('list-toggle').innerHTML=listOpen?'&#10005; Close':'&#9776; List';
+}
+
+window.addEventListener('resize',()=>{setHdrH();loadTiles();renderPins();});
+window.addEventListener('orientationchange',()=>{setTimeout(()=>{setHdrH();loadTiles();renderPins();},300);});
+
+// ── INIT ────────────────────────────────────────────────────
+setHdrH();
+loadCache();
+loadTiles();
+renderPins();
+setTimeout(geocodeAll, 500);
+</script>
+</body>
+</html>
